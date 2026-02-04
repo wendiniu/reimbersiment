@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>审票大法</title>
+
+<style>
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+}
+
+.container {
+    text-align: center;
+    padding: 30px 50px;
+    margin: 20px 0;
+    max-height: 90vh;
+    overflow-y: auto;
+
+    background-image: url('C:\\Users\\wd129\\Desktop\\IMG_8020.JPG.JPG');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    color: white;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 600px;
+    margin: 20px auto;
+    color: white;
+}
+
+td, th {
+    border: 1px solid #fff;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+}
+
+#inputA {
+    width: 250px;
+    font-size: 20px;
+    padding: 10px;
+    margin-bottom: 10px;
+    color: black;
+}
+
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+h2, h3, p {
+    margin: 5px 0;
+    color: white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h2>审票大法</h2>
+
+<input type="number" id="inputA" placeholder="请输入数字 A">
+
+<div>
+    <button onclick="addRow()">添加</button>
+    <button onclick="undoLast()">后退</button>
+    <button onclick="clearTable()">清除数据</button>
+    <button onclick="toggleTax()" id="taxBtn">增值税：含税</button>
+</div>
+
+<table id="dataTable">
+    <tr>
+        <th>A</th>
+        <th>B = 税额</th>
+        <th>C = 合计</th>
+        <th style="display:none">taxFlag</th>
+    </tr>
+</table>
+
+<h3>合计：</h3>
+<p>A 合计：<span id="sumA">0.00</span></p>
+<p>B 合计：<span id="sumB">0.00</span></p>
+<p>C 合计：<span id="sumC">0.00</span></p>
+</div>
+
+<script>
+// ================== 全局变量 ==================
+let currentWithTax = true; // 只影响新行
+
+// ================== 工具函数 ==================
+function formatNumber(num) {
+    return num.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+// ================== 切换增值税 ==================
+function toggleTax() {
+    currentWithTax = !currentWithTax;
+    document.getElementById("taxBtn").innerText =
+        currentWithTax ? "增值税：含税" : "增值税：不含税";
+}
+
+// ================== 添加一行 ==================
+function addRow() {
+    let A = parseFloat(document.getElementById("inputA").value);
+    if (isNaN(A)) {
+        alert("请输入有效数字 A");
+        return;
+    }
+
+    let B = currentWithTax ? A * 0.05 : 0;
+    let C = A + B;
+
+    let table = document.getElementById("dataTable");
+    let row = table.insertRow(-1);
+
+    row.insertCell(0).innerText = formatNumber(A);
+    row.insertCell(1).innerText = formatNumber(B);
+    row.insertCell(2).innerText = formatNumber(C);
+
+    let taxCell = row.insertCell(3);
+    taxCell.innerText = currentWithTax ? "1" : "0";
+    taxCell.style.display = "none";
+
+    updateSum();
+    document.getElementById("inputA").value = "";
+    document.getElementById("inputA").focus();
+}
+
+// ================== 后退 ==================
+function undoLast() {
+    let table = document.getElementById("dataTable");
+    if (table.rows.length > 1) {
+        table.deleteRow(table.rows.length - 1);
+        updateSum();
+    }
+    document.getElementById("inputA").focus();
+}
+
+// ================== 清空 ==================
+function clearTable() {
+    let table = document.getElementById("dataTable");
+    while (table.rows.length > 1) {
+        table.deleteRow(1);
+    }
+    updateSum();
+    document.getElementById("inputA").value = "";
+    document.getElementById("inputA").focus();
+}
+
+// ================== 更新合计 ==================
+function updateSum() {
+    let table = document.getElementById("dataTable");
+    let sumA = 0, sumB = 0, sumC = 0;
+
+    for (let i = 1; i < table.rows.length; i++) {
+        sumA += parseFloat(table.rows[i].cells[0].innerText.replace(/,/g, ''));
+        sumB += parseFloat(table.rows[i].cells[1].innerText.replace(/,/g, ''));
+        sumC += parseFloat(table.rows[i].cells[2].innerText.replace(/,/g, ''));
+    }
+
+    document.getElementById("sumA").innerText = formatNumber(sumA);
+    document.getElementById("sumB").innerText = formatNumber(sumB);
+    document.getElementById("sumC").innerText = formatNumber(sumC);
+}
+
+// ================== 双击编辑 ==================
+document.getElementById("dataTable").addEventListener("dblclick", function(e) {
+    let cell = e.target;
+    if (cell.tagName !== "TD") return;
+
+    let row = cell.parentNode;
+    let colIndex = cell.cellIndex;
+    if (colIndex > 2) return;
+
+    let oldValue = parseFloat(cell.innerText.replace(/,/g, ''));
+    let input = document.createElement("input");
+    input.type = "number";
+    input.value = oldValue;
+
+    cell.innerHTML = "";
+    cell.appendChild(input);
+    input.focus();
+
+    function save() {
+        let newValue = parseFloat(input.value);
+        if (isNaN(newValue)) newValue = oldValue;
+
+        let taxFlag = row.cells[3].innerText === "1";
+        let A, B, C;
+
+        if (colIndex === 0) {
+            A = newValue;
+            B = taxFlag ? A * 0.05 : 0;
+            C = A + B;
+        } else if (colIndex === 1) {
+            A = parseFloat(row.cells[0].innerText.replace(/,/g, ''));
+            B = newValue;
+            C = A + B;
+        }
+
+        row.cells[0].innerText = formatNumber(A);
+        row.cells[1].innerText = formatNumber(B);
+        row.cells[2].innerText = formatNumber(C);
+
+        updateSum();
+    }
+
+    input.addEventListener("keydown", function(ev) {
+        if (ev.key === "Enter") {
+            save();
+            input.blur();
+        }
+    });
+
+    input.addEventListener("blur", save);
+});
+
+// ================== 键盘快捷 ==================
+document.addEventListener("keydown", function(e) {
+    let active = document.activeElement;
+
+    // Alt = 切换增值税
+    if (e.key === "Alt") {
+        e.preventDefault();
+        toggleTax();
+        return;
+    }
+
+    if (active === document.getElementById("inputA")) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            addRow();
+        }
+        if (e.key === "Backspace" && active.value === "") {
+            e.preventDefault();
+            undoLast();
+        }
+        return;
+    }
+
+    if (active.tagName === "INPUT") return;
+
+    if (e.key === "Backspace") {
+        e.preventDefault();
+        undoLast();
+    }
+    if (e.key === "Delete") {
+        e.preventDefault();
+        clearTable();
+    }
+});
+</script>
+
+</body>
+</html>
